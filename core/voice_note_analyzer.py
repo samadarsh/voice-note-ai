@@ -2,10 +2,10 @@ import json
 import os
 from typing import Any
 
-from groq_client import get_groq_client
-from intent_parser import INTENT_SCHEMA_KEYS, normalize_intent_result
-from note_summarizer import SUMMARY_SCHEMA_KEYS, normalize_summary_result
-from text_utils import extract_json
+from core.groq_client import get_groq_client
+from core.intent_parser import INTENT_SCHEMA_KEYS, normalize_intent_result
+from core.note_summarizer import SUMMARY_SCHEMA_KEYS, normalize_summary_result
+from core.text_utils import extract_json
 
 
 class VoiceNoteAnalysisError(RuntimeError):

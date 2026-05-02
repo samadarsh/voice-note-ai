@@ -5,9 +5,12 @@ import sounddevice as sd
 from dotenv import load_dotenv
 from scipy.io.wavfile import write
 
-from session_store import build_session_note, create_session_id, save_session_note
-from transcribe_file import DEFAULT_INITIAL_PROMPT, transcribe_audio
-from voice_note_analyzer import analyze_note
+import sys
+sys.path.append(str(Path(__file__).parent.parent))
+
+from storage.session_store import build_session_note, create_session_id, save_session_note
+from core.transcriber import DEFAULT_INITIAL_PROMPT, transcribe_audio
+from core.voice_note_analyzer import analyze_note
 
 
 def record_audio(output_path: Path, duration: float, sample_rate: int) -> None:

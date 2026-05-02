@@ -1,6 +1,6 @@
 from typing import Any
 
-from text_utils import (
+from core.text_utils import (
     extract_personal_intro_context,
     is_personal_introduction,
     normalize_known_terms,

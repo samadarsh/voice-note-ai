@@ -5,9 +5,9 @@ from pathlib import Path
 import streamlit as st
 from dotenv import load_dotenv
 
-from session_store import build_session_note, create_session_id, save_session_note
-from transcribe_file import transcribe_audio
-from voice_note_analyzer import analyze_note
+from storage.session_store import build_session_note, create_session_id, save_session_note
+from core.transcriber import transcribe_audio
+from core.voice_note_analyzer import analyze_note
 
 
 def configure_api_key() -> None:
