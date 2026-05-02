@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from intent_parser import parse_intent, print_intent
 from note_summarizer import print_summary, summarize_note
-from session_store import build_session_note, get_next_session_id, save_session_note
+from session_store import build_session_note, create_session_id, save_session_note
 
 
 DEFAULT_INITIAL_PROMPT = (
@@ -14,6 +14,10 @@ DEFAULT_INITIAL_PROMPT = (
     "Common phrases include கோபமா வருது, பசிக்குது, சந்தோஷம், budget-friendly, "
     "nearby, reminder, meeting note, and action items."
 )
+
+
+class TranscriptionError(RuntimeError):
+    """Raised when Whisper cannot load a model or transcribe audio."""
 
 
 def transcribe_audio(
@@ -25,14 +29,21 @@ def transcribe_audio(
     if not audio_path.exists():
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
-    model = whisper.load_model(model_name)
+    try:
+        model = whisper.load_model(model_name)
+    except Exception as exc:
+        raise TranscriptionError(f"Could not load Whisper model '{model_name}': {exc}") from exc
+
     options = {}
     if language:
         options["language"] = language
     if initial_prompt:
         options["initial_prompt"] = initial_prompt
 
-    result = model.transcribe(str(audio_path), **options)
+    try:
+        result = model.transcribe(str(audio_path), **options)
+    except Exception as exc:
+        raise TranscriptionError(f"Whisper could not transcribe '{audio_path}': {exc}") from exc
     return result["text"].strip()
 
 
@@ -97,7 +108,7 @@ def main() -> None:
 
             if args.save:
                 outputs_dir = Path(args.outputs_dir)
-                session_id = get_next_session_id(outputs_dir)
+                session_id = create_session_id(outputs_dir)
                 session_note = build_session_note(
                     session_id=session_id,
                     audio_file=Path(args.audio_file),

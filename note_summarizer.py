@@ -3,7 +3,7 @@ import os
 from typing import Any
 
 from groq_client import get_groq_client
-from text_utils import extract_json, normalize_tanglish
+from text_utils import extract_json
 
 
 SUMMARY_SCHEMA_KEYS = [
@@ -32,6 +32,8 @@ Rules:
 - Keep cleaned_transcript in the same language as the original when possible.
 - The short_summary must be in English by default.
 - For Tamil/Tanglish, explain the meaning clearly in English in short_summary.
+- For Tanglish, use language understanding to normalize meaning naturally; do
+  not rely on fixed word replacements.
 - Do not treat casual, short, Tamil, or Tanglish speech as low quality when the
   meaning is clear.
 - If the meaning is clear, always extract at least 1-2 key points.
@@ -116,11 +118,9 @@ def summarize_note(
 ) -> dict[str, Any]:
     client = get_groq_client()
     model_name = model or os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
-    normalized_transcript = normalize_tanglish(transcript)
 
     user_content = {
         "raw_transcript": transcript,
-        "normalized_hint": normalized_transcript if normalized_transcript != transcript else None,
         "intent": intent_data or {},
     }
 

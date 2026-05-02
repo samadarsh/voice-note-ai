@@ -5,7 +5,7 @@ from typing import Any
 from groq_client import get_groq_client
 from intent_parser import INTENT_SCHEMA_KEYS, normalize_intent_result
 from note_summarizer import SUMMARY_SCHEMA_KEYS, normalize_summary_result
-from text_utils import extract_json, normalize_tanglish
+from text_utils import extract_json
 
 
 class VoiceNoteAnalysisError(RuntimeError):
@@ -46,6 +46,8 @@ Rules:
 - cleaned_transcript may lightly fix grammar, fillers, repeated words, and
   broken flow while preserving meaning.
 - Keep Tamil/Tanglish text in the original script when possible.
+- For Tanglish/code-mixed speech, normalize meaning using language
+  understanding instead of fixed word replacements.
 - The summary short_summary should be in English by default.
 - Do not invent details.
 - Extract action_items only when the user mentions something to do or a next step.
@@ -62,11 +64,9 @@ Tamil emotion guidance:
 def analyze_note(transcript: str, model: str | None = None) -> dict[str, Any]:
     client = get_groq_client()
     model_name = model or os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
-    normalized_transcript = normalize_tanglish(transcript)
 
     user_content = {
         "raw_transcript": transcript,
-        "normalized_hint": normalized_transcript if normalized_transcript != transcript else None,
     }
 
     try:
@@ -81,7 +81,7 @@ def analyze_note(transcript: str, model: str | None = None) -> dict[str, Any]:
         )
         content = response.choices[0].message.content or "{}"
         data = extract_json(content)
-        intent = normalize_intent_result(data.get("intent") or {}, transcript, normalized_transcript)
+        intent = normalize_intent_result(data.get("intent") or {}, transcript)
         summary = normalize_summary_result(data.get("summary") or {}, transcript)
         return {"intent": intent, "summary": summary}
     except json.JSONDecodeError as exc:

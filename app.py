@@ -5,7 +5,7 @@ from pathlib import Path
 import streamlit as st
 from dotenv import load_dotenv
 
-from session_store import build_session_note, get_next_session_id, save_session_note
+from session_store import build_session_note, create_session_id, save_session_note
 from transcribe_file import transcribe_audio
 from voice_note_analyzer import analyze_note
 
@@ -40,7 +40,7 @@ def process_audio(
         summary = analysis["summary"]
 
         outputs_dir = Path("outputs")
-        session_id = get_next_session_id(outputs_dir)
+        session_id = create_session_id(outputs_dir)
         session_note = build_session_note(
             session_id=session_id,
             audio_file=audio_path,
@@ -68,10 +68,10 @@ def render_list(items: list[str], empty_text: str) -> None:
         st.caption(empty_text)
 
 
-st.set_page_config(page_title="Voice Note AI", page_icon="🎙️", layout="centered")
+st.set_page_config(page_title="VoiceNote AI", page_icon="🎙️", layout="centered")
 configure_api_key()
 
-st.title("🎙️ Voice Note AI")
+st.title("🎙️ VoiceNote AI")
 
 with st.sidebar:
     st.header("Settings")

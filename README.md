@@ -99,8 +99,8 @@ voice-note-ai/
 ├── text_utils.py             # Shared JSON and multilingual text helpers
 ├── groq_client.py            # Reused Groq client singleton
 ├── session_store.py          # Session ID and JSON saving helpers
-├── parse_intent.py           # Thin CLI wrapper around intent_parser.py
 ├── requirements.txt          # Python dependencies
+├── .github/workflows/ci.yml  # Compile-only CI check
 ├── .env.example              # Example environment variables
 └── outputs/                  # Sample saved session JSON files
 ```

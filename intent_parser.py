@@ -3,7 +3,7 @@ import os
 from typing import Any
 
 from groq_client import get_groq_client
-from text_utils import contains_indic_text, extract_json, normalize_tanglish
+from text_utils import contains_indic_text, extract_json
 
 
 INTENT_SCHEMA_KEYS = [
@@ -46,8 +46,9 @@ Rules:
 - cleaned_transcript may lightly fix grammar, fillers, repeated words, and
   broken flow while preserving meaning.
 - If Tamil or Tanglish is present, keep the original transcript exact.
-- For Tamil/Tanglish, cleaned_transcript may normalize clear code-mixed words
-  only when it improves readability and preserves meaning.
+- For Tamil/Tanglish, use language understanding to normalize clear code-mixed
+  words in cleaned_transcript only when it improves readability and preserves
+  meaning. Do not rely on literal word substitution.
 - Do not include execution instructions, API routing, confirmation, or
   clarification fields.
 - Location-dependent requests are still notes. Mention missing location only as
@@ -201,7 +202,7 @@ def normalize_intent_result(
     cleaned_transcript = normalized_transcript or transcript.strip()
     normalized = {key: data.get(key) for key in INTENT_SCHEMA_KEYS}
     normalized["raw_transcript"] = transcript
-    if contains_indic_text(transcript):
+    if contains_indic_text(transcript) and normalized_transcript:
         normalized["cleaned_transcript"] = cleaned_transcript
     else:
         normalized["cleaned_transcript"] = normalized["cleaned_transcript"] or transcript.strip()
@@ -228,10 +229,8 @@ def normalize_intent_result(
 def parse_intent(transcript: str, model: str | None = None) -> dict[str, Any]:
     client = get_groq_client()
     model_name = model or os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
-    normalized_transcript = normalize_tanglish(transcript)
+    normalized_transcript = None
     user_content = f"Transcript: {transcript}"
-    if normalized_transcript != transcript:
-        user_content += f"\nNormalized hint: {normalized_transcript}"
 
     try:
         response = client.chat.completions.create(
@@ -244,7 +243,7 @@ def parse_intent(transcript: str, model: str | None = None) -> dict[str, Any]:
             response_format={"type": "json_object"},
         )
         content = response.choices[0].message.content or "{}"
-        return normalize_intent_result(extract_json(content), transcript, normalized_transcript)
+        return normalize_intent_result(extract_json(content), transcript)
     except json.JSONDecodeError as exc:
         raise IntentParsingError("Groq returned intent output that was not valid JSON.") from exc
     except Exception as exc:

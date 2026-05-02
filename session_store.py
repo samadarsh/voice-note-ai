@@ -5,7 +5,7 @@ from typing import Any
 from uuid import uuid4
 
 
-def get_next_session_id(outputs_dir: Path) -> str:
+def create_session_id(outputs_dir: Path) -> str:
     outputs_dir.mkdir(exist_ok=True)
     return f"session_{uuid4().hex[:8]}"
 

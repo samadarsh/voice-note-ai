@@ -7,7 +7,7 @@ from scipy.io.wavfile import write
 
 from intent_parser import parse_intent, print_intent
 from note_summarizer import summarize_note
-from session_store import build_session_note, get_next_session_id, save_session_note
+from session_store import build_session_note, create_session_id, save_session_note
 from transcribe_file import DEFAULT_INITIAL_PROMPT, transcribe_audio
 
 
@@ -67,7 +67,7 @@ def print_note_output(
 
 def process_recording(args: object) -> None:
     outputs_dir = Path(args.outputs_dir)
-    session_id = get_next_session_id(outputs_dir)
+    session_id = create_session_id(outputs_dir)
     audio_path = outputs_dir / f"{session_id}.wav"
 
     record_audio(audio_path, args.duration, args.sample_rate)
