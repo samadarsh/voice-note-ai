@@ -3,6 +3,7 @@ import tempfile
 from pathlib import Path
 
 import streamlit as st
+from dotenv import load_dotenv
 
 from intent_parser import parse_intent
 from note_summarizer import summarize_note
@@ -11,6 +12,7 @@ from transcribe_file import transcribe_audio
 
 
 def configure_api_key() -> None:
+    load_dotenv()
     try:
         api_key = st.secrets.get("GROQ_API_KEY", None)
     except Exception:
@@ -77,7 +79,7 @@ if audio_source:
 
 if st.button("Process Voice Note", type="primary", disabled=audio_source is None):
     if not os.getenv("GROQ_API_KEY"):
-        st.error("Missing GROQ_API_KEY. Add it in Streamlit secrets before deploying.")
+        st.error("Missing GROQ_API_KEY. Add it to your local .env file or Streamlit Cloud secrets.")
         st.stop()
 
     with st.spinner("Transcribing and analyzing your voice note..."):
