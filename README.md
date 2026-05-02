@@ -91,14 +91,18 @@ flowchart LR
 ```text
 voice-note-ai/
 ├── app.py                    # Streamlit web app
-├── record_and_transcribe.py  # CLI recorder workflow
-├── transcribe_file.py        # Transcribe and process existing audio files
-├── intent_parser.py          # Intent schema and normalization helpers
-├── note_summarizer.py        # Summary schema and normalization helpers
-├── voice_note_analyzer.py    # Combined Groq intent + summary analysis
-├── text_utils.py             # Shared JSON and multilingual text helpers
-├── groq_client.py            # Reused Groq client singleton
-├── session_store.py          # Session ID and JSON saving helpers
+├── core/                     # Core AI & Business Logic
+│   ├── transcriber.py        # Whisper transcription logic
+│   ├── voice_note_analyzer.py# Combined Groq intent + summary analysis
+│   ├── intent_parser.py      # Intent schema and normalization helpers
+│   ├── note_summarizer.py    # Summary schema and normalization helpers
+│   ├── text_utils.py         # Shared JSON and multilingual text helpers
+│   └── groq_client.py        # Reused Groq client singleton
+├── storage/                  # Data Persistence
+│   └── session_store.py      # Session ID and JSON saving helpers
+├── scripts/                  # CLI Tools
+│   ├── record_and_transcribe.py # CLI recorder workflow
+│   └── transcribe_file.py    # Transcribe and process existing audio files
 ├── requirements.txt          # Python dependencies
 ├── .github/workflows/ci.yml  # Compile-only CI check
 ├── .env.example              # Example environment variables
@@ -182,25 +186,25 @@ streamlit run app.py
 Record and process a voice note from the CLI:
 
 ```bash
-python record_and_transcribe.py --once
+python scripts/record_and_transcribe.py --once
 ```
 
 Transcribe and process an existing audio file:
 
 ```bash
-python transcribe_file.py path/to/audio.wav --analyze
+python scripts/transcribe_file.py path/to/audio.wav --analyze
 ```
 
 For Tamil-heavy audio, you can pass a Whisper language hint:
 
 ```bash
-python transcribe_file.py path/to/audio.wav --language ta --analyze
+python scripts/transcribe_file.py path/to/audio.wav --language ta --analyze
 ```
 
 Analyze and save an existing audio file:
 
 ```bash
-python transcribe_file.py path/to/audio.wav --save
+python scripts/transcribe_file.py path/to/audio.wav --save
 ```
 
 ---
