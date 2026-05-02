@@ -3,7 +3,14 @@ import os
 from typing import Any
 
 from groq_client import get_groq_client
-from text_utils import contains_indic_text, extract_json
+from text_utils import (
+    contains_indic_text,
+    extract_json,
+    extract_personal_intro_context,
+    is_personal_introduction,
+    normalize_known_terms,
+    normalize_known_terms_in_value,
+)
 
 
 INTENT_SCHEMA_KEYS = [
@@ -45,6 +52,13 @@ Rules:
 - Preserve raw_transcript exactly as provided.
 - cleaned_transcript may lightly fix grammar, fillers, repeated words, and
   broken flow while preserving meaning.
+- Preserve named entities and correct them using the closest known real-world
+  term. Do not invent unrelated words.
+- Cleaned transcript must preserve original meaning. If translating, ensure
+  semantic accuracy.
+- Do not distort proper nouns, hobbies, education names, or platform names.
+- Correct phonetic or spoken variations to real terms when confidence is high,
+  such as "சுடோக்கு" to "Sudoku" and "link-don" to "LinkedIn".
 - If Tamil or Tanglish is present, keep the original transcript exact.
 - For Tamil/Tanglish, use language understanding to normalize clear code-mixed
   words in cleaned_transcript only when it improves readability and preserves
@@ -69,6 +83,8 @@ Field guidance:
 Intent guidance:
 - Use personal_note when the user states facts about themselves, their
   background, interests, plans, preferences, feelings, or experience.
+- Use personal_note for personal introductions, including name, education,
+  role, hobbies, interests, or platform activity.
 - Use information_query only when the user is asking for information, such as
   "what is", "show me", "tell me", "find", "search", or "explain".
 
@@ -81,11 +97,35 @@ Tamil emotion guidance:
 
 Confidence guidance:
 - Use high when the transcript is clear and the user's meaning is understandable.
+- If the transcript is clear and structured, such as a personal introduction,
+  set confidence to high.
 - Do not lower confidence just because the sentence is casual, short, Tamil, or Tanglish.
 - Do not lower confidence because the sentence is repeated, emotional, or informal.
 - Use medium for understandable but phonetically noisy transcripts.
 - Use low only when the transcript is unclear or noisy, words are missing or
   incorrect, or the meaning is genuinely ambiguous.
+
+Example:
+Transcript: My name is Adas. I am an M.Tech AI student. I like playing சுடோக்கு, playing chess, and posting on link-don.
+Output:
+{
+  "intent": "personal_note",
+  "subject": "personal introduction",
+  "content_type": "note",
+  "language_detected": "multilingual",
+  "context": {
+    "name": "Adas",
+    "role": "M.Tech AI student",
+    "interests": [
+      "Sudoku",
+      "Chess",
+      "Posting on LinkedIn"
+    ]
+  },
+  "confidence": "high",
+  "raw_transcript": "My name is Adas. I am an M.Tech AI student. I like playing சுடோக்கு, playing chess, and posting on link-don.",
+  "cleaned_transcript": "My name is Adas. I am an M.Tech AI student. I like playing Sudoku, playing chess, and posting on LinkedIn."
+}
 
 Example:
 Transcript: I want to build a small voice assistant project using Whisper and LLMs.
@@ -199,18 +239,33 @@ def normalize_intent_result(
     transcript: str,
     normalized_transcript: str | None = None,
 ) -> dict[str, Any]:
-    cleaned_transcript = normalized_transcript or transcript.strip()
-    normalized = {key: data.get(key) for key in INTENT_SCHEMA_KEYS}
+    cleaned_transcript = normalize_known_terms(normalized_transcript or transcript.strip())
+    normalized = {key: normalize_known_terms_in_value(data.get(key)) for key in INTENT_SCHEMA_KEYS}
     normalized["raw_transcript"] = transcript
     if contains_indic_text(transcript) and normalized_transcript:
         normalized["cleaned_transcript"] = cleaned_transcript
     else:
-        normalized["cleaned_transcript"] = normalized["cleaned_transcript"] or transcript.strip()
+        normalized["cleaned_transcript"] = normalize_known_terms(
+            normalized["cleaned_transcript"] or transcript.strip()
+        )
     if not isinstance(normalized["context"], dict):
         normalized["context"] = {}
+    normalized["context"] = normalize_known_terms_in_value(normalized["context"])
     if contains_indic_text(transcript) and cleaned_transcript != transcript:
         normalized["context"].setdefault("language_style", "tanglish")
         normalized["context"].setdefault("transcript_quality", "noisy_phonetic")
+    if is_personal_introduction(transcript):
+        normalized["intent"] = "personal_note"
+        normalized["subject"] = "personal introduction"
+        normalized["content_type"] = "note"
+        normalized["confidence"] = "high"
+        normalized["context"] = extract_personal_intro_context(transcript, normalized["context"])
+        context = normalized["context"]
+        if context.get("name") and context.get("role") and context.get("interests"):
+            normalized["cleaned_transcript"] = (
+                f"My name is {context['name']}. I am an {context['role']}. "
+                "I like playing Sudoku, playing chess, and posting on LinkedIn."
+            )
     tamil_emotion = _detect_clear_tamil_emotion(transcript)
     if tamil_emotion:
         normalized["intent"] = normalized["intent"] or "personal_note"

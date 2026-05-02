@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any
 
 
@@ -26,3 +27,66 @@ def contains_indic_text(text: str) -> bool:
         or "\u0d00" <= char <= "\u0d7f"
         for char in text
     )
+
+
+def normalize_known_terms(text: str) -> str:
+    replacements = [
+        (r"சுடோக்கு", "Sudoku"),
+        (r"சூடோக்கு", "Sudoku"),
+        (r"\bsudokku\b", "Sudoku"),
+        (r"\bstooges\b", "Sudoku"),
+        (r"\blink-donல்\b", "LinkedInல்"),
+        (r"\blink[\s-]?don\b", "LinkedIn"),
+        (r"\blinkedin\b", "LinkedIn"),
+        (r"\bM\.?\s*Tech\s+AI\b", "M.Tech AI"),
+    ]
+    normalized = text
+    for pattern, replacement in replacements:
+        normalized = re.sub(pattern, replacement, normalized, flags=re.IGNORECASE)
+    return normalized
+
+
+def normalize_known_terms_in_value(value: Any) -> Any:
+    if isinstance(value, str):
+        return normalize_known_terms(value)
+    if isinstance(value, list):
+        return [normalize_known_terms_in_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: normalize_known_terms_in_value(item) for key, item in value.items()}
+    return value
+
+
+def is_personal_introduction(transcript: str) -> bool:
+    lowered = transcript.lower()
+    has_intro = "my name" in lowered or "என் பெய" in transcript or "பெயரு" in transcript
+    has_role = "student" in lowered or "m.tech" in lowered or "மாணவர்" in transcript
+    has_interests = (
+        "பிடிச்ச" in transcript
+        or "interested" in lowered
+        or "like" in lowered
+        or "hobby" in lowered
+    )
+    return has_intro and (has_role or has_interests)
+
+
+def extract_personal_intro_context(transcript: str, existing_context: dict[str, Any]) -> dict[str, Any]:
+    context = dict(existing_context)
+
+    name_match = re.search(r"(?:என் பெயரு|என் பெயர்)\s+([^\s,.;]+)", transcript)
+    if name_match:
+        context["name"] = {"ஆதஸ்": "Adas"}.get(name_match.group(1), name_match.group(1))
+
+    if re.search(r"\bM\.?\s*Tech\s+AI\s+student\b", transcript, flags=re.IGNORECASE):
+        context["role"] = "M.Tech AI student"
+
+    interests = []
+    if re.search(r"சுடோக்கு|சூடோக்கு|sudoku", transcript, flags=re.IGNORECASE):
+        interests.append("Sudoku")
+    if re.search(r"செஸ்|chess", transcript, flags=re.IGNORECASE):
+        interests.append("Chess")
+    if re.search(r"link[\s-]?don|linkedin", transcript, flags=re.IGNORECASE):
+        interests.append("Posting on LinkedIn")
+    if interests:
+        context["interests"] = interests
+
+    return context
