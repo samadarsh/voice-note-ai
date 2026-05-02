@@ -62,14 +62,12 @@ It understands what the user said and converts it into a structured note that ca
 ## 🏗️ System Architecture
 
 ```mermaid
-flowchart TD
-    A[User Voice / Audio File] --> B[Whisper Transcription]
-    B --> C[Raw Transcript]
-    C --> D[Groq LLM Intent Parser]
-    D --> E[Structured Intent JSON]
-    E --> F[Groq LLM Summarizer]
-    F --> G[Summary + Key Points + Action Items]
-    G --> H[Saved Session JSON]
+flowchart LR
+    A[Audio] --> B[Whisper]
+    B --> C[Transcript]
+    C --> D[Intent]
+    D --> E[Summary]
+    E --> F[JSON]
 ```
 
 ---
