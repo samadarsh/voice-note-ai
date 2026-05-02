@@ -90,23 +90,23 @@ flowchart LR
 
 ```text
 voice-note-ai/
-├── app.py                    # Streamlit web app
-├── core/                     # Core AI & Business Logic
-│   ├── transcriber.py        # Whisper transcription logic
-│   ├── voice_note_analyzer.py# Combined Groq intent + summary analysis
-│   ├── intent_parser.py      # Intent schema and normalization helpers
-│   ├── note_summarizer.py    # Summary schema and normalization helpers
-│   ├── text_utils.py         # Shared JSON and multilingual text helpers
-│   └── groq_client.py        # Reused Groq client singleton
-├── storage/                  # Data Persistence
-│   └── session_store.py      # Session ID and JSON saving helpers
-├── scripts/                  # CLI Tools
-│   ├── record_and_transcribe.py # CLI recorder workflow
-│   └── transcribe_file.py    # Transcribe and process existing audio files
-├── requirements.txt          # Python dependencies
-├── .github/workflows/ci.yml  # Compile-only CI check
-├── .env.example              # Example environment variables
-└── outputs/                  # Sample saved session JSON files
+├── app.py                         # Streamlit web app
+├── core/                          # Core AI & Business Logic
+│   ├── transcriber.py             # Whisper transcription logic
+│   ├── voice_note_analyzer.py     # Combined Groq intent + summary analysis
+│   ├── intent_parser.py           # Intent schema and normalization helpers
+│   ├── note_summarizer.py         # Summary schema and normalization helpers
+│   ├── text_utils.py              # Shared JSON and multilingual text helpers
+│   └── groq_client.py             # Reused Groq client singleton
+├── storage/                       # Data Persistence
+│   └── session_store.py           # Session ID and JSON saving helpers
+├── scripts/                       # CLI Tools
+│   ├── record_and_transcribe.py   # CLI recorder workflow
+│   └── transcribe_file.py         # Transcribe and process existing audio files
+├── requirements.txt               # Python dependencies
+├── .github/workflows/ci.yml       # Compile-only CI check
+├── .env.example                   # Example environment variables
+└── outputs/                       # Sample saved session JSON files
 ```
 
 ---
