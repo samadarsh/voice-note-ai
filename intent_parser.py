@@ -57,12 +57,6 @@ def normalize_intent_result(
         normalized["content_type"] = "note"
         normalized["confidence"] = "high"
         normalized["context"] = extract_personal_intro_context(transcript, normalized["context"])
-        context = normalized["context"]
-        if context.get("name") and context.get("role") and context.get("interests"):
-            normalized["cleaned_transcript"] = (
-                f"My name is {context['name']}. I am an {context['role']}. "
-                "I like playing Sudoku, playing chess, and posting on LinkedIn."
-            )
     tamil_emotion = _detect_clear_tamil_emotion(transcript)
     if tamil_emotion:
         normalized["intent"] = normalized["intent"] or "personal_note"

@@ -39,17 +39,6 @@ def normalize_summary_result(data: dict[str, Any], transcript: str) -> dict[str,
         role = context.get("role")
         interests = context.get("interests", [])
         if name and role and interests:
-            normalized["short_summary"] = (
-                f"The user introduces themselves as an {role} named {name} "
-                f"and mentions interests in Sudoku, chess, and posting on LinkedIn."
-            )
-            normalized["key_points"] = [
-                f"Name: {name}",
-                f"Education: {role}",
-                "Interests: Sudoku, Chess, LinkedIn posting",
-            ]
-            normalized["action_items"] = []
-            normalized["important_entities"] = [name, "M.Tech AI", "Sudoku", "Chess", "LinkedIn"]
             normalized["language_detected"] = "multilingual"
             normalized["suggested_title"] = "Personal Introduction"
     return normalized

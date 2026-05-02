@@ -70,23 +70,5 @@ def is_personal_introduction(transcript: str) -> bool:
 
 
 def extract_personal_intro_context(transcript: str, existing_context: dict[str, Any]) -> dict[str, Any]:
-    context = dict(existing_context)
-
-    name_match = re.search(r"(?:என் பெயரு|என் பெயர்)\s+([^\s,.;]+)", transcript)
-    if name_match:
-        context["name"] = {"ஆதஸ்": "Adas"}.get(name_match.group(1), name_match.group(1))
-
-    if re.search(r"\bM\.?\s*Tech\s+AI\s+student\b", transcript, flags=re.IGNORECASE):
-        context["role"] = "M.Tech AI student"
-
-    interests = []
-    if re.search(r"சுடோக்கு|சூடோக்கு|sudoku", transcript, flags=re.IGNORECASE):
-        interests.append("Sudoku")
-    if re.search(r"செஸ்|chess", transcript, flags=re.IGNORECASE):
-        interests.append("Chess")
-    if re.search(r"link[\s-]?don|linkedin", transcript, flags=re.IGNORECASE):
-        interests.append("Posting on LinkedIn")
-    if interests:
-        context["interests"] = interests
-
-    return context
+    # Let the LLM handle context extraction dynamically based on ANALYSIS_PROMPT
+    return existing_context
