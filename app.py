@@ -75,7 +75,11 @@ st.title("🎙️ VoiceNote AI")
 
 with st.sidebar:
     st.header("Settings")
-    whisper_model = st.selectbox("Whisper model", ["tiny", "base", "small", "medium"], index=0)
+    whisper_model = st.selectbox(
+        "Whisper model",
+        ["tiny", "base", "small", "medium", "large", "turbo"],
+        index=0,
+    )
     language_label = st.selectbox("Language hint", ["Auto-detect", "Tamil", "English"], index=0)
     groq_model = st.text_input("Groq model", value=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"))
     language = {"Auto-detect": None, "Tamil": "ta", "English": "en"}[language_label]
