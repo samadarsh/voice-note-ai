@@ -33,6 +33,16 @@ def build_session_note(
     }
 
 
+def cleanup_old_sessions(outputs_dir: Path, max_files: int = 20) -> None:
+    if not outputs_dir.exists():
+        return
+    json_files = list(outputs_dir.glob("session_*.json"))
+    if len(json_files) > max_files:
+        json_files.sort(key=lambda p: p.stat().st_mtime)
+        for old_file in json_files[:-max_files]:
+            old_file.unlink(missing_ok=True)
+
+
 def save_session_note(outputs_dir: Path, session_note: dict[str, Any]) -> Path:
     outputs_dir.mkdir(exist_ok=True)
     output_path = outputs_dir / f"{session_note['session_id']}.json"
@@ -40,4 +50,5 @@ def save_session_note(outputs_dir: Path, session_note: dict[str, Any]) -> Path:
         json.dumps(session_note, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
+    cleanup_old_sessions(outputs_dir, max_files=20)
     return output_path

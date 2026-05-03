@@ -6,7 +6,7 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from storage.session_store import build_session_note, create_session_id, save_session_note
-from core.transcriber import transcribe_audio
+from core.transcriber import DEFAULT_INITIAL_PROMPT, transcribe_audio
 from core.voice_note_analyzer import analyze_note
 
 
@@ -34,7 +34,9 @@ def process_audio(
     language: str | None,
 ) -> dict:
     try:
-        transcript = transcribe_audio(audio_path, whisper_model, language)
+        # Avoid biasing language detection when auto-detecting
+        prompt = DEFAULT_INITIAL_PROMPT if language else None
+        transcript = transcribe_audio(audio_path, whisper_model, language, initial_prompt=prompt)
         analysis = analyze_note(transcript, groq_model)
         intent = analysis["intent"]
         summary = analysis["summary"]

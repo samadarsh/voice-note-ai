@@ -3,7 +3,7 @@ import whisper
 
 DEFAULT_INITIAL_PROMPT = (
     "This audio may contain English, Tamil, Tanglish, or mixed-language voice notes. "
-    "Common phrases include கோபமா வருது, பசிக்குது, சந்தோஷம், budget-friendly, "
+    "Common phrases include kobama varuthu, pasikkuthu, santhosham, budget-friendly, "
     "nearby, reminder, meeting note, and action items."
 )
 
