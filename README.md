@@ -52,6 +52,8 @@ The system produces a structured note:
 - 📝 Generate summaries, key points, and action items
 - 🌐 Supports English, Tamil, Tanglish, and mixed-language speech
 - 💾 Saves every session as JSON inside the `outputs/` folder
+- ⬇️ Download processed notes instantly as formatted text files
+- 🐳 Fully containerized with Docker support
 - 🖥️ Includes both Streamlit app and CLI workflow
 
 ---
@@ -103,10 +105,13 @@ voice-note-ai/
 ├── scripts/                       # CLI Tools
 │   ├── record_and_transcribe.py   # CLI recorder workflow
 │   └── transcribe_file.py         # Transcribe and process existing audio files
+├── Dockerfile                     # Docker configuration
+├── .dockerignore                  # Docker ignore rules
+├── packages.txt                   # System dependencies for Docker container
 ├── requirements.txt               # Python dependencies
 ├── .github/workflows/ci.yml       # Compile-only CI check
 ├── .env.example                   # Example environment variables
-└── outputs/                       # Sample saved session JSON files
+└── outputs/                       # Saved session JSON files
 ```
 
 ---
@@ -206,6 +211,24 @@ Analyze and save an existing audio file:
 ```bash
 python scripts/transcribe_file.py path/to/audio.wav --save
 ```
+
+---
+
+## 🐳 Docker Usage
+
+You can run the entire application without installing Python dependencies locally using Docker:
+
+1. Build the Docker image:
+```bash
+docker build -t voice-note-ai .
+```
+
+2. Run the Docker container (passing your Groq API key):
+```bash
+docker run -p 8501:8501 -e GROQ_API_KEY="your_groq_api_key_here" voice-note-ai
+```
+
+3. Open `http://localhost:8501` in your browser.
 
 ---
 
