@@ -43,78 +43,50 @@ Intent values:
 
 Rules:
 - Preserve raw_transcript exactly as provided.
-- cleaned_transcript may lightly fix grammar, fillers, repeated words, and
-  broken flow while preserving meaning.
-- Cleaned transcript must preserve original meaning. If translating, ensure
-  semantic accuracy.
-- Preserve named entities and correct them using the closest known real-world
-  term. Do not invent unrelated words.
-- Do not distort proper nouns, hobbies, education names, or platform names.
-- Correct phonetic or spoken variations to real terms when confidence is high,
-  such as "சுடோக்கு" to "Sudoku" and "link-don" to "LinkedIn".
-- Use personal_note for personal introductions, including name, education,
-  role, hobbies, interests, or platform activity.
-- If the transcript is clear and structured, such as a personal introduction,
-  set confidence to high.
-- For personal introductions, structure context with name, role, and interests
-  as an array when present.
-- For personal introductions, separate name, education or role, and interests
-  clearly in the key points.
-- Keep Tamil/Tanglish text in the original script when that is more faithful;
-  if translating to English, preserve the exact meaning.
-- For Tanglish/code-mixed speech, normalize meaning using language
-  understanding instead of fixed word replacements.
-- The summary short_summary should be in English by default.
-- Do not invent details.
-- Extract action_items only when the user mentions something to do or a next step.
+- cleaned_transcript may lightly fix grammar, fillers, repeated words, and broken flow while preserving meaning.
+- Cleaned transcript must preserve original meaning. If translating, ensure semantic accuracy.
+- Correct phonetic or spoken variations to real terms when confidence is high (e.g., mispronounced proper nouns or tech terms).
+- For Tanglish/code-mixed speech, normalize meaning using language understanding.
+- Keep Tamil/Tanglish text in the original script when that is more faithful; if translating to English, preserve the exact meaning.
+- Identify the emotions, intent, and overall context to appropriately set the `confidence`, `content_type`, and `subject` fields.
+- Extract any relevant structural information from the transcript and place it in the `context` dictionary.
+- The `short_summary` should be in English by default.
+- Do not invent details or assume information not present in the transcript.
+- Extract `action_items` only when the user mentions something to do or a next step.
 - For missing information, include it as context metadata or a conditional action item.
 
-Tamil emotion guidance:
-- கோவம் / கோவமா வருது means anger or feeling angry.
-- சோகம் / வருத்தமா இருக்கு means sadness or feeling sad.
-- சந்தோஷம் means happiness.
-- Do not convert anger into sadness.
-
 Example:
-Transcript: என் பெயரு ஆதஸ் நான் ஒரு M.Tech AI student எனக்கு மிகவும் பிடிச்ச விஷயம் சுடோக்கு விளையாடுவது, செஸ் விளையாடுவது, link-donல் போஸ்ட் போடுவது
+Transcript: I need to buy milk tomorrow and also remind me to call mom
 Output:
 {{
   "intent": {{
-    "intent": "personal_note",
-    "subject": "personal introduction",
-    "content_type": "note",
-    "language_detected": "multilingual",
+    "intent": "task_or_reminder",
+    "subject": "Buy milk and call mom",
+    "content_type": "reminder",
+    "language_detected": "English",
     "context": {{
-      "name": "Adas",
-      "role": "M.Tech AI student",
-      "interests": [
-        "Sudoku",
-        "Chess",
-        "Posting on LinkedIn"
-      ]
+      "timeframe": "tomorrow"
     }},
     "confidence": "high",
-    "raw_transcript": "என் பெயரு ஆதஸ் நான் ஒரு M.Tech AI student எனக்கு மிகவும் பிடிச்ச விஷயம் சுடோக்கு விளையாடுவது, செஸ் விளையாடுவது, link-donல் போஸ்ட் போடுவது",
-    "cleaned_transcript": "My name is Adas. I am an M.Tech AI student. I like playing Sudoku, playing chess, and posting on LinkedIn."
+    "raw_transcript": "I need to buy milk tomorrow and also remind me to call mom",
+    "cleaned_transcript": "I need to buy milk tomorrow. Also, remind me to call mom."
   }},
   "summary": {{
-    "cleaned_transcript": "My name is Adas. I am an M.Tech AI student. I like playing Sudoku, playing chess, and posting on LinkedIn.",
-    "short_summary": "The user introduces themselves as an M.Tech AI student named Adas and mentions interests in Sudoku, chess, and posting on LinkedIn.",
+    "cleaned_transcript": "I need to buy milk tomorrow. Also, remind me to call mom.",
+    "short_summary": "The user needs a reminder to buy milk tomorrow and call their mom.",
     "key_points": [
-      "Name: Adas",
-      "Education: M.Tech AI student",
-      "Interests: Sudoku, Chess, LinkedIn posting"
+      "Buy milk tomorrow",
+      "Call mom"
     ],
-    "action_items": [],
+    "action_items": [
+      "Buy milk",
+      "Call mom"
+    ],
     "important_entities": [
-      "Adas",
-      "M.Tech AI",
-      "Sudoku",
-      "Chess",
-      "LinkedIn"
+      "mom"
     ],
-    "language_detected": "multilingual",
-    "suggested_title": "Personal Introduction"
+    "language_detected": "English",
+    "suggested_title": "Chores and Reminders"
   }}
 }}
 """

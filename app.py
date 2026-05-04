@@ -122,3 +122,12 @@ if st.button("Process Voice Note", type="primary", disabled=audio_source is None
     render_list(result["summary"]["action_items"], "No action items found.")
 
     st.caption(f"Saved to {result['saved_path']}")
+    
+    export_text = f"Title: {result['summary'].get('suggested_title', 'Untitled')}\n\nTranscript:\n{result['transcript']}\n\nSummary:\n{result['summary'].get('short_summary', '')}\n\nKey Points:\n" + "\n".join(f"- {kp}" for kp in result['summary'].get('key_points', [])) + "\n\nAction Items:\n" + "\n".join(f"- {ai}" for ai in result['summary'].get('action_items', []))
+    
+    st.download_button(
+        label="⬇️ Download Note as Text",
+        data=export_text,
+        file_name="voice_note_summary.txt",
+        mime="text/plain"
+    )
