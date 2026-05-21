@@ -10,6 +10,7 @@ __pycache__/
 *.m4a
 *.ogg
 *.flac
+!sample_inputs/
+!sample_inputs/**
 
-!outputs/
-!outputs/*.json
+outputs/

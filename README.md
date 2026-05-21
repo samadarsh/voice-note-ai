@@ -53,7 +53,7 @@ The system produces a structured note (saved as `outputs/session_<id>.json`):
 - ⚡ Groq LLM for intent, summary, key points, and action items
 - 🌐 English, Tamil, Tanglish, and mixed-language speech (optional Whisper language hint)
 - 📊 **Staged UI**: transcript appears before Groq analysis finishes
-- 📜 **Session history** in the sidebar (browse past `outputs/session_*.json`)
+- 🎧 **One-click sample audio** from `sample_inputs/` (no upload needed for demos)
 - 💾 JSON sessions plus downloadable plain-text export
 - 🖥️ Streamlit app, CLI scripts, and Docker Compose
 
@@ -98,7 +98,8 @@ This repo converges ideas from [task2 ASR + transliteration](https://github.com/
 ```text
 VoiceNote-AI/
 ├── config.py                      # Env-driven defaults
-├── app.py                         # Streamlit (staged ASR → analysis, history sidebar)
+├── app.py                         # Streamlit (samples, staged ASR → analysis)
+├── sample_inputs/                 # Bundled demo audio (one-click in UI)
 ├── core/
 │   ├── whisper_service.py         # Cached Whisper + chunked transcription
 │   ├── audio_chunker.py           # Long-audio splitting (pydub)
@@ -122,7 +123,7 @@ VoiceNote-AI/
 ├── Dockerfile
 ├── requirements.txt
 ├── .env.example                   # Template — copy to .env
-└── outputs/                       # session_*.json (gitignored in normal use)
+└── outputs/                       # session_*.json (local only, not committed)
 ```
 
 ---
@@ -209,11 +210,18 @@ The sidebar shows **Groq: Configured (gsk_xxxx…yyyy)** when the key looks vali
 streamlit run app.py
 ```
 
-Open the URL shown (usually `http://localhost:8501`). In the sidebar:
+Open the URL shown (usually `http://localhost:8501`).
+
+**Main area**
+
+- Under **Try a sample**, preview audio from `sample_inputs/` and click **Use this sample** (add your own `.wav` / `.mp3` files to that folder)
+- **Record** a voice note or **upload** a file
+- Click **Process Voice Note**
+
+**Sidebar**
 
 - Choose **Whisper model** and **language hint** (Tamil hint can use `medium` automatically)
 - Enable **Force chunked ASR** for long recordings
-- Browse **History** for past sessions
 - Use **Clear cached Whisper model** if you switch model size and want a fresh load
 
 Processing is staged: you see the **transcript** (and romanization if applicable) before Groq analysis completes.
@@ -251,9 +259,13 @@ Ensure `.env` exists beside `docker-compose.yml` with a valid `GROQ_API_KEY`. Th
 ### Tests
 
 ```bash
-python -m unittest discover -s tests -v
-# or: pip install pytest && pytest tests/ -v
+# From the project root (VoiceNote-AI/)
+pytest tests/ -q
+# or:
+python -m pytest tests/ -v
 ```
+
+`pytest.ini` sets `pythonpath = .` so `core` and `config` imports resolve.
 
 ---
 
@@ -279,6 +291,12 @@ Whisper downloads model weights on first use. `medium` is ~1.5GB. Use `tiny` or 
 
 ```bash
 pip install -r requirements.txt
+```
+
+### `No module named 'audioop'` (Python 3.13 + pydub)
+
+```bash
+pip install audioop-lts
 ```
 
 ### FFmpeg errors

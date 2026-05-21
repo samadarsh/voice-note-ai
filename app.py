@@ -15,7 +15,34 @@ from core.logging_config import setup_logging
 from core.pipeline import analyze_step, save_step, transcribe_step
 from core.groq_client import groq_api_key_status, is_configured_groq_api_key
 from core.whisper_service import clear_model_cache
-from storage.session_store import list_session_files, load_session_note
+
+SAMPLE_INPUTS_DIR = Path(__file__).resolve().parent / "sample_inputs"
+SAMPLE_AUDIO_EXTENSIONS = {".wav", ".mp3", ".m4a", ".ogg", ".flac"}
+SAMPLE_AUDIO_MIME = {
+    ".wav": "audio/wav",
+    ".mp3": "audio/mpeg",
+    ".m4a": "audio/mp4",
+    ".ogg": "audio/ogg",
+    ".flac": "audio/flac",
+}
+
+
+def list_sample_input_files() -> list[Path]:
+    if not SAMPLE_INPUTS_DIR.is_dir():
+        return []
+    return sorted(
+        p
+        for p in SAMPLE_INPUTS_DIR.iterdir()
+        if p.is_file() and p.suffix.lower() in SAMPLE_AUDIO_EXTENSIONS
+    )
+
+
+def sample_label(path: Path) -> str:
+    return path.stem.replace("_", " ").replace("-", " ").strip().title() or path.name
+
+
+def sample_mime(path: Path) -> str:
+    return SAMPLE_AUDIO_MIME.get(path.suffix.lower(), "audio/wav")
 
 
 def configure_api_key() -> None:
@@ -67,27 +94,6 @@ def build_export_text(result: dict) -> str:
     return "\n".join(lines)
 
 
-def render_session_history(outputs_dir: Path) -> None:
-    sessions = list_session_files(outputs_dir)
-    if not sessions:
-        st.caption("No saved sessions yet.")
-        return
-
-    labels = [p.name for p in sessions]
-    choice = st.selectbox("Past sessions", labels, index=0)
-    if not choice:
-        return
-
-    note = load_session_note(outputs_dir / choice)
-    st.markdown(f"**{note.get('suggested_title', note['session_id'])}**")
-    st.caption(note.get("timestamp", ""))
-    st.write(note.get("raw_transcript", ""))
-    if note.get("transliteration"):
-        with st.expander("Romanized (ASCII)"):
-            st.code(note["transliteration"])
-    st.write(note.get("summary", ""))
-
-
 setup_logging()
 st.set_page_config(page_title="VoiceNote AI", page_icon="🎙️", layout="centered")
 configure_api_key()
@@ -124,20 +130,49 @@ with st.sidebar:
         clear_model_cache()
         st.success("Model cache cleared.")
 
-    st.divider()
-    st.subheader("History")
-    render_session_history(outputs_dir)
+sample_files = list_sample_input_files()
+if sample_files:
+    st.subheader("Try a sample")
+    sample_cols = st.columns(len(sample_files))
+    for col, sample_path in zip(sample_cols, sample_files):
+        with col:
+            st.caption(sample_label(sample_path))
+            st.audio(sample_path.read_bytes(), format=sample_mime(sample_path))
+            if st.button(
+                "Use this sample",
+                key=f"sample_{sample_path.name}",
+                use_container_width=True,
+            ):
+                st.session_state["active_sample"] = sample_path.name
+                st.rerun()
+else:
+    st.caption("Add audio files to the `sample_inputs/` folder to show samples here.")
+
+if st.session_state.get("active_sample"):
+    active_name = st.session_state["active_sample"]
+    st.info(f"Sample selected: **{sample_label(SAMPLE_INPUTS_DIR / active_name)}**")
+    if st.button("Clear sample"):
+        st.session_state.pop("active_sample", None)
+        st.rerun()
 
 audio_input = st.audio_input("Record a voice note")
 uploaded_file = st.file_uploader(
     "Or upload an audio file", type=["wav", "mp3", "m4a", "ogg", "flac"]
 )
-audio_source = audio_input or uploaded_file
 
-if audio_source:
-    st.audio(audio_source)
+live_input = audio_input or uploaded_file
+if live_input:
+    st.session_state.pop("active_sample", None)
+    st.audio(live_input)
+elif active_sample_file := st.session_state.get("active_sample"):
+    preview = SAMPLE_INPUTS_DIR / active_sample_file
+    if preview.exists():
+        st.audio(preview.read_bytes(), format=sample_mime(preview))
 
-if st.button("Process Voice Note", type="primary", disabled=audio_source is None):
+active_sample_file = st.session_state.get("active_sample")
+has_audio = bool(live_input or active_sample_file)
+
+if st.button("Process Voice Note", type="primary", disabled=not has_audio):
     if not is_configured_groq_api_key():
         st.error(
             "Groq API key is missing or invalid. Create `.env` in the project root with:\n\n"
@@ -148,8 +183,16 @@ if st.button("Process Voice Note", type="primary", disabled=audio_source is None
         st.stop()
 
     audio_path: Path | None = None
+    delete_audio_after = False
     try:
-        audio_path = save_uploaded_audio(audio_source)
+        if live_input:
+            audio_path = save_uploaded_audio(live_input)
+            delete_audio_after = True
+        elif active_sample_file:
+            audio_path = SAMPLE_INPUTS_DIR / active_sample_file
+            if not audio_path.exists():
+                st.error(f"Sample file not found: {audio_path.name}")
+                st.stop()
         chunked = True if force_chunked else None
 
         with st.spinner("Transcribing audio…"):
@@ -221,5 +264,5 @@ if st.button("Process Voice Note", type="primary", disabled=audio_source is None
             "in `.env` and try again."
         )
     finally:
-        if audio_path is not None:
+        if delete_audio_after and audio_path is not None:
             audio_path.unlink(missing_ok=True)
