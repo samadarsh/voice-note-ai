@@ -1,15 +1,16 @@
 from argparse import ArgumentParser
 from pathlib import Path
 
-import whisper
 from dotenv import load_dotenv
 
 import sys
+
 sys.path.append(str(Path(__file__).parent.parent))
 
-from storage.session_store import build_session_note, create_session_id, save_session_note
-from core.voice_note_analyzer import analyze_note
-from core.transcriber import DEFAULT_INITIAL_PROMPT, transcribe_audio
+from config import GROQ_MODEL_DEFAULT, OUTPUTS_DIR, WHISPER_MODEL_DEFAULT
+from core.logging_config import setup_logging
+from core.pipeline import analyze_step, save_step, transcribe_step
+from core.transcriber import DEFAULT_INITIAL_PROMPT
 
 
 def print_json(data: dict) -> None:
@@ -23,8 +24,8 @@ def main() -> None:
     parser.add_argument("audio_file", help="Path to the audio file to transcribe.")
     parser.add_argument(
         "--model",
-        default="tiny",
-        help="Whisper model to use. Default: tiny.",
+        default=WHISPER_MODEL_DEFAULT,
+        help=f"Whisper model to use. Default: {WHISPER_MODEL_DEFAULT}.",
     )
     parser.add_argument(
         "--language",
@@ -34,7 +35,7 @@ def main() -> None:
     parser.add_argument(
         "--initial-prompt",
         default=DEFAULT_INITIAL_PROMPT,
-        help="Optional Whisper prompt used to bias transcription for mixed-language voice notes.",
+        help="Optional Whisper prompt for mixed-language voice notes.",
     )
     parser.add_argument("--analyze", action="store_true", help="Analyze transcript with Groq.")
     parser.add_argument(
@@ -43,43 +44,78 @@ def main() -> None:
         help="Analyze and save output to outputs/session_<id>.json.",
     )
     parser.add_argument(
+        "--transliterate-only",
+        action="store_true",
+        help="Transcribe (+ romanize if Tamil) only; skip Groq.",
+    )
+    parser.add_argument(
+        "--chunked",
+        action="store_true",
+        help="Force chunked ASR for long audio.",
+    )
+    parser.add_argument(
+        "--no-chunked",
+        action="store_true",
+        help="Disable chunked ASR (single Whisper call).",
+    )
+    parser.add_argument(
         "--outputs-dir",
-        default="outputs",
-        help="Folder for saved session JSON files. Default: outputs.",
+        default=OUTPUTS_DIR,
+        help="Folder for saved session JSON files.",
     )
     parser.add_argument(
         "--groq-model",
         default=None,
-        help="Groq model to use for analysis. Defaults to GROQ_MODEL or llama-3.1-8b-instant.",
+        help=f"Groq model for analysis. Default: {GROQ_MODEL_DEFAULT}.",
     )
     args = parser.parse_args()
+    setup_logging()
     load_dotenv()
 
-    text = transcribe_audio(Path(args.audio_file), args.model, args.language, args.initial_prompt)
-    print(text)
+    chunked = None
+    if args.chunked:
+        chunked = True
+    elif args.no_chunked:
+        chunked = False
+
+    audio_path = Path(args.audio_file)
+    tx = transcribe_step(audio_path, args.model, args.language, chunked=chunked)
+
+    print(tx["transcript"])
+    if tx.get("transliteration"):
+        print("\nTransliteration (ASCII):")
+        print(tx["transliteration"])
+    if tx.get("asr_meta"):
+        print("\nASR meta:", tx["asr_meta"])
+
+    if args.transliterate_only:
+        return
 
     if args.analyze or args.save:
-        analysis = analyze_note(text, args.groq_model)
+        analysis = analyze_step(
+            tx["transcript"],
+            args.groq_model,
+            transliteration=tx.get("transliteration"),
+        )
         intent_result = analysis["intent"]
         summary_result = analysis["summary"]
 
-        print("Intent:")
+        print("\nIntent:")
         print_json(intent_result)
-        print("Summary:")
+        print("\nSummary:")
         print_json(summary_result)
 
         if args.save:
-            outputs_dir = Path(args.outputs_dir)
-            session_id = create_session_id(outputs_dir)
-            session_note = build_session_note(
-                session_id=session_id,
-                audio_file=Path(args.audio_file),
-                raw_transcript=text,
-                intent=intent_result,
-                summary=summary_result,
+            saved_path = save_step(
+                audio_path,
+                tx["transcript"],
+                intent_result,
+                summary_result,
+                transliteration=tx.get("transliteration"),
+                asr_meta=tx.get("asr_meta"),
+                outputs_dir=Path(args.outputs_dir),
             )
-            saved_path = save_session_note(outputs_dir, session_note)
-            print("Saved to:")
+            print("\nSaved to:")
             print(saved_path)
 
 

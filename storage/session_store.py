@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from config import SESSION_MAX_FILES
+
 
 def create_session_id(outputs_dir: Path) -> str:
     outputs_dir.mkdir(exist_ok=True)
@@ -16,8 +18,10 @@ def build_session_note(
     raw_transcript: str,
     intent: dict[str, Any],
     summary: dict[str, Any],
+    transliteration: str | None = None,
+    asr_meta: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return {
+    note: dict[str, Any] = {
         "session_id": session_id,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "audio_file": str(audio_file),
@@ -31,6 +35,25 @@ def build_session_note(
         "language_detected": summary["language_detected"],
         "suggested_title": summary["suggested_title"],
     }
+    if transliteration:
+        note["transliteration"] = transliteration
+    if asr_meta:
+        note["asr_meta"] = asr_meta
+    return note
+
+
+def list_session_files(outputs_dir: Path) -> list[Path]:
+    if not outputs_dir.exists():
+        return []
+    return sorted(
+        outputs_dir.glob("session_*.json"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+
+
+def load_session_note(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def cleanup_old_sessions(outputs_dir: Path, max_files: int = 20) -> None:
@@ -50,5 +73,5 @@ def save_session_note(outputs_dir: Path, session_note: dict[str, Any]) -> Path:
         json.dumps(session_note, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
-    cleanup_old_sessions(outputs_dir, max_files=20)
+    cleanup_old_sessions(outputs_dir, max_files=SESSION_MAX_FILES)
     return output_path

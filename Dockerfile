@@ -1,4 +1,4 @@
-# Use official Python image as a base
+# VoiceNote AI — requires GROQ_API_KEY at runtime (see docker-compose env_file: .env)
 FROM python:3.11-slim
 
 # Set the working directory in the container
@@ -9,6 +9,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     build-essential \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file first to leverage Docker cache

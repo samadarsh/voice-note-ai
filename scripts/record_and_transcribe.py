@@ -8,9 +8,10 @@ from scipy.io.wavfile import write
 import sys
 sys.path.append(str(Path(__file__).parent.parent))
 
-from storage.session_store import build_session_note, create_session_id, save_session_note
-from core.transcriber import DEFAULT_INITIAL_PROMPT, transcribe_audio
-from core.voice_note_analyzer import analyze_note
+from config import OUTPUTS_DIR, WHISPER_MODEL_DEFAULT
+from core.logging_config import setup_logging
+from core.pipeline import analyze_step, save_step, transcribe_step
+from storage.session_store import create_session_id
 
 
 def record_audio(output_path: Path, duration: float, sample_rate: int) -> None:
@@ -81,7 +82,12 @@ def process_recording(args: object) -> None:
     record_audio(audio_path, args.duration, args.sample_rate)
 
     print("Transcribing...")
-    transcript = transcribe_audio(audio_path, args.model, args.language, args.initial_prompt)
+    tx = transcribe_step(audio_path, args.model, args.language)
+    transcript = tx["transcript"]
+
+    if tx.get("transliteration"):
+        print("\nTransliteration (ASCII):")
+        print(tx["transliteration"])
 
     if not args.analyze:
         print("Transcript:")
@@ -89,18 +95,23 @@ def process_recording(args: object) -> None:
         return
 
     print("Analyzing...")
-    analysis = analyze_note(transcript, args.groq_model)
+    analysis = analyze_step(
+        transcript,
+        args.groq_model,
+        transliteration=tx.get("transliteration"),
+    )
     intent_result = analysis["intent"]
     summary_result = analysis["summary"]
 
-    session_note = build_session_note(
-        session_id=session_id,
-        audio_file=audio_path,
-        raw_transcript=transcript,
-        intent=intent_result,
-        summary=summary_result,
+    saved_path = save_step(
+        audio_path,
+        transcript,
+        intent_result,
+        summary_result,
+        transliteration=tx.get("transliteration"),
+        asr_meta=tx.get("asr_meta"),
+        outputs_dir=outputs_dir,
     )
-    saved_path = save_session_note(outputs_dir, session_note)
 
     print_note_output(audio_path, transcript, intent_result, summary_result, saved_path)
 
@@ -126,18 +137,13 @@ def main() -> None:
     )
     parser.add_argument(
         "--model",
-        default="tiny",
-        help="Whisper model to use. Default: tiny.",
+        default=WHISPER_MODEL_DEFAULT,
+        help=f"Whisper model to use. Default: {WHISPER_MODEL_DEFAULT}.",
     )
     parser.add_argument(
         "--language",
         default=None,
         help="Optional Whisper language code, such as en or ta. Default: auto-detect.",
-    )
-    parser.add_argument(
-        "--initial-prompt",
-        default=DEFAULT_INITIAL_PROMPT,
-        help="Optional Whisper prompt used to bias transcription for mixed-language voice notes.",
     )
     parser.add_argument(
         "--groq-model",
@@ -168,8 +174,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--outputs-dir",
-        default="outputs",
-        help="Folder for session WAV and JSON files. Default: outputs.",
+        default=OUTPUTS_DIR,
+        help=f"Folder for session WAV and JSON files. Default: {OUTPUTS_DIR}.",
     )
     parser.add_argument(
         "--once",
@@ -177,6 +183,7 @@ def main() -> None:
         help="Process one recording and exit without loop prompt.",
     )
     args = parser.parse_args()
+    setup_logging()
     load_dotenv()
     if args.skip_llm or args.skip_intent:
         args.analyze = False

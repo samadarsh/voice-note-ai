@@ -29,4 +29,8 @@ def contains_indic_text(text: str) -> bool:
     )
 
 
+def contains_tamil_script(text: str) -> bool:
+    return any("\u0b80" <= char <= "\u0bff" for char in text)
+
+
 

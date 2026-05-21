@@ -2,7 +2,7 @@ import json
 import os
 from typing import Any
 
-from core.groq_client import get_groq_client
+from core.groq_client import INVALID_GROQ_KEY_HELP, get_groq_client, is_groq_auth_error
 from core.intent_parser import INTENT_SCHEMA_KEYS, normalize_intent_result
 from core.note_summarizer import SUMMARY_SCHEMA_KEYS, normalize_summary_result
 from core.text_utils import extract_json
@@ -92,13 +92,22 @@ Output:
 """
 
 
-def analyze_note(transcript: str, model: str | None = None) -> dict[str, Any]:
+def analyze_note(
+    transcript: str,
+    model: str | None = None,
+    transliteration: str | None = None,
+) -> dict[str, Any]:
     client = get_groq_client()
     model_name = model or os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 
-    user_content = {
+    user_content: dict[str, Any] = {
         "raw_transcript": transcript,
     }
+    if transliteration:
+        user_content["romanized_hint"] = (
+            "ASCII romanization of Tamil portions (hint only; do not replace raw_transcript): "
+            + transliteration
+        )
 
     try:
         response = client.chat.completions.create(
@@ -118,4 +127,6 @@ def analyze_note(transcript: str, model: str | None = None) -> dict[str, Any]:
     except json.JSONDecodeError as exc:
         raise VoiceNoteAnalysisError("Groq returned analysis output that was not valid JSON.") from exc
     except Exception as exc:
+        if is_groq_auth_error(exc):
+            raise VoiceNoteAnalysisError(INVALID_GROQ_KEY_HELP) from exc
         raise VoiceNoteAnalysisError(f"Groq voice-note analysis failed: {exc}") from exc

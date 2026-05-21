@@ -5,9 +5,17 @@ from pathlib import Path
 import streamlit as st
 from dotenv import load_dotenv
 
-from storage.session_store import build_session_note, create_session_id, save_session_note
-from core.transcriber import DEFAULT_INITIAL_PROMPT, transcribe_audio
-from core.voice_note_analyzer import analyze_note
+from config import (
+    GROQ_MODEL_DEFAULT,
+    OUTPUTS_DIR,
+    WHISPER_MODEL_CHOICES,
+    WHISPER_MODEL_DEFAULT,
+)
+from core.logging_config import setup_logging
+from core.pipeline import analyze_step, save_step, transcribe_step
+from core.groq_client import groq_api_key_status, is_configured_groq_api_key
+from core.whisper_service import clear_model_cache
+from storage.session_store import list_session_files, load_session_note
 
 
 def configure_api_key() -> None:
@@ -27,41 +35,6 @@ def save_uploaded_audio(uploaded_audio) -> Path:
         return Path(temp_file.name)
 
 
-def process_audio(
-    audio_path: Path,
-    whisper_model: str,
-    groq_model: str | None,
-    language: str | None,
-) -> dict:
-    try:
-        # Avoid biasing language detection when auto-detecting
-        prompt = DEFAULT_INITIAL_PROMPT if language else None
-        transcript = transcribe_audio(audio_path, whisper_model, language, initial_prompt=prompt)
-        analysis = analyze_note(transcript, groq_model)
-        intent = analysis["intent"]
-        summary = analysis["summary"]
-
-        outputs_dir = Path("outputs")
-        session_id = create_session_id(outputs_dir)
-        session_note = build_session_note(
-            session_id=session_id,
-            audio_file=audio_path,
-            raw_transcript=transcript,
-            intent=intent,
-            summary=summary,
-        )
-        saved_path = save_session_note(outputs_dir, session_note)
-
-        return {
-            "transcript": transcript,
-            "intent": intent,
-            "summary": summary,
-            "saved_path": saved_path,
-        }
-    finally:
-        audio_path.unlink(missing_ok=True)
-
-
 def render_list(items: list[str], empty_text: str) -> None:
     if items:
         for item in items:
@@ -70,64 +43,183 @@ def render_list(items: list[str], empty_text: str) -> None:
         st.caption(empty_text)
 
 
+def build_export_text(result: dict) -> str:
+    lines = [
+        f"Title: {result['summary'].get('suggested_title', 'Untitled')}",
+        "",
+        "Transcript:",
+        result["transcript"],
+    ]
+    if result.get("transliteration"):
+        lines.extend(["", "Transliteration (ASCII):", result["transliteration"]])
+    lines.extend(
+        [
+            "",
+            "Summary:",
+            result["summary"].get("short_summary", ""),
+            "",
+            "Key Points:",
+        ]
+    )
+    lines.extend(f"- {kp}" for kp in result["summary"].get("key_points", []) or ["None"])
+    lines.extend(["", "Action Items:"])
+    lines.extend(f"- {ai}" for ai in result["summary"].get("action_items", []) or ["None"])
+    return "\n".join(lines)
+
+
+def render_session_history(outputs_dir: Path) -> None:
+    sessions = list_session_files(outputs_dir)
+    if not sessions:
+        st.caption("No saved sessions yet.")
+        return
+
+    labels = [p.name for p in sessions]
+    choice = st.selectbox("Past sessions", labels, index=0)
+    if not choice:
+        return
+
+    note = load_session_note(outputs_dir / choice)
+    st.markdown(f"**{note.get('suggested_title', note['session_id'])}**")
+    st.caption(note.get("timestamp", ""))
+    st.write(note.get("raw_transcript", ""))
+    if note.get("transliteration"):
+        with st.expander("Romanized (ASCII)"):
+            st.code(note["transliteration"])
+    st.write(note.get("summary", ""))
+
+
+setup_logging()
 st.set_page_config(page_title="VoiceNote AI", page_icon="🎙️", layout="centered")
 configure_api_key()
 
 st.title("🎙️ VoiceNote AI")
+outputs_dir = Path(OUTPUTS_DIR)
 
 with st.sidebar:
     st.header("Settings")
+    default_index = (
+        WHISPER_MODEL_CHOICES.index(WHISPER_MODEL_DEFAULT)
+        if WHISPER_MODEL_DEFAULT in WHISPER_MODEL_CHOICES
+        else 2
+    )
     whisper_model = st.selectbox(
         "Whisper model",
-        ["tiny", "base", "small", "medium", "large", "turbo"],
-        index=0,
+        list(WHISPER_MODEL_CHOICES),
+        index=default_index,
     )
-    language_label = st.selectbox("Language hint", ["Auto-detect", "Tamil", "English"], index=0)
-    groq_model = st.text_input("Groq model", value=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"))
+    language_label = st.selectbox(
+        "Language hint", ["Auto-detect", "Tamil", "English"], index=0
+    )
     language = {"Auto-detect": None, "Tamil": "ta", "English": "en"}[language_label]
+    force_chunked = st.checkbox("Force chunked ASR (long audio)", value=False)
+    groq_model = st.text_input("Groq model", value=os.getenv("GROQ_MODEL", GROQ_MODEL_DEFAULT))
+
+    groq_ok, groq_status = groq_api_key_status()
+    if groq_ok:
+        st.caption(f"Groq: {groq_status}")
+    else:
+        st.warning(f"Groq: {groq_status}")
+
+    if st.button("Clear cached Whisper model"):
+        clear_model_cache()
+        st.success("Model cache cleared.")
+
+    st.divider()
+    st.subheader("History")
+    render_session_history(outputs_dir)
 
 audio_input = st.audio_input("Record a voice note")
-uploaded_file = st.file_uploader("Or upload an audio file", type=["wav", "mp3", "m4a", "ogg", "flac"])
+uploaded_file = st.file_uploader(
+    "Or upload an audio file", type=["wav", "mp3", "m4a", "ogg", "flac"]
+)
 audio_source = audio_input or uploaded_file
 
 if audio_source:
     st.audio(audio_source)
 
 if st.button("Process Voice Note", type="primary", disabled=audio_source is None):
-    if not os.getenv("GROQ_API_KEY"):
-        st.error("Missing GROQ_API_KEY. Add it to your local .env file or Streamlit Cloud secrets.")
+    if not is_configured_groq_api_key():
+        st.error(
+            "Groq API key is missing or invalid. Create `.env` in the project root with:\n\n"
+            "`GROQ_API_KEY=gsk_your_real_key`\n\n"
+            "Get a key at https://console.groq.com/keys — do not leave the "
+            "`.env.example` placeholder. Restart Streamlit after saving."
+        )
         st.stop()
 
-    with st.spinner("Transcribing and analyzing your voice note..."):
-        try:
-            audio_path = save_uploaded_audio(audio_source)
-            result = process_audio(audio_path, whisper_model, groq_model or None, language)
-        except Exception as exc:
-            st.error(f"Could not process this audio: {exc}")
-            st.stop()
+    audio_path: Path | None = None
+    try:
+        audio_path = save_uploaded_audio(audio_source)
+        chunked = True if force_chunked else None
 
-    st.subheader("Transcript")
-    st.write(result["transcript"])
+        with st.spinner("Transcribing audio…"):
+            tx = transcribe_step(audio_path, whisper_model, language, chunked=chunked)
 
-    st.subheader("Intent")
-    st.json(result["intent"])
+        st.subheader("Transcript")
+        st.write(tx["transcript"])
+        if tx.get("transliteration"):
+            with st.expander("Romanized (ASCII)"):
+                st.code(tx["transliteration"])
+        if tx.get("asr_meta"):
+            st.caption(
+                f"ASR: model={tx['asr_meta'].get('model')} · "
+                f"chunked={tx['asr_meta'].get('chunked')} · "
+                f"chunks={tx['asr_meta'].get('chunk_count')}"
+            )
 
-    st.subheader("Summary")
-    st.write(result["summary"]["short_summary"])
+        with st.spinner("Analyzing intent and summary…"):
+            analysis = analyze_step(
+                tx["transcript"],
+                groq_model or None,
+                transliteration=tx.get("transliteration"),
+            )
 
-    st.subheader("Key Points")
-    render_list(result["summary"]["key_points"], "No key points found.")
+        intent = analysis["intent"]
+        summary = analysis["summary"]
+        saved_path = save_step(
+            audio_path,
+            tx["transcript"],
+            intent,
+            summary,
+            transliteration=tx.get("transliteration"),
+            asr_meta=tx.get("asr_meta"),
+            outputs_dir=outputs_dir,
+        )
 
-    st.subheader("Action Items")
-    render_list(result["summary"]["action_items"], "No action items found.")
+        result = {
+            "transcript": tx["transcript"],
+            "transliteration": tx.get("transliteration"),
+            "intent": intent,
+            "summary": summary,
+            "saved_path": saved_path,
+        }
 
-    st.caption(f"Saved to {result['saved_path']}")
-    
-    export_text = f"Title: {result['summary'].get('suggested_title', 'Untitled')}\n\nTranscript:\n{result['transcript']}\n\nSummary:\n{result['summary'].get('short_summary', '')}\n\nKey Points:\n" + "\n".join(f"- {kp}" for kp in result['summary'].get('key_points', [])) + "\n\nAction Items:\n" + "\n".join(f"- {ai}" for ai in result['summary'].get('action_items', []))
-    
-    st.download_button(
-        label="⬇️ Download Note as Text",
-        data=export_text,
-        file_name="voice_note_summary.txt",
-        mime="text/plain"
-    )
+        st.subheader("Intent")
+        st.json(result["intent"])
+
+        st.subheader("Summary")
+        st.write(result["summary"]["short_summary"])
+
+        st.subheader("Key Points")
+        render_list(result["summary"]["key_points"], "No key points found.")
+
+        st.subheader("Action Items")
+        render_list(result["summary"]["action_items"], "No action items found.")
+
+        st.caption(f"Saved to {result['saved_path']}")
+
+        st.download_button(
+            label="⬇️ Download Note as Text",
+            data=build_export_text(result),
+            file_name="voice_note_summary.txt",
+            mime="text/plain",
+        )
+    except Exception as exc:
+        st.error(str(exc))
+        st.caption(
+            "If transcription succeeded above, your Whisper step is fine — fix the Groq key "
+            "in `.env` and try again."
+        )
+    finally:
+        if audio_path is not None:
+            audio_path.unlink(missing_ok=True)
