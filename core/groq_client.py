@@ -1,9 +1,11 @@
 import os
 import re
+from typing import TYPE_CHECKING
 
-from groq import Groq
+if TYPE_CHECKING:
+    from groq import Groq
 
-_client: Groq | None = None
+_client: "Groq | None" = None
 _client_api_key: str | None = None
 
 _PLACEHOLDER_PATTERNS = (
@@ -47,8 +49,9 @@ def groq_api_key_status() -> tuple[bool, str]:
     return True, f"Configured ({key[:8]}…{key[-4:]})"
 
 
-def get_groq_client() -> Groq:
+def get_groq_client() -> "Groq":
     global _client, _client_api_key
+    from groq import Groq
 
     api_key = get_groq_api_key()
     if not api_key or not api_key.strip():

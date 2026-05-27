@@ -1,16 +1,22 @@
-# Requires .env in project root with a valid GROQ_API_KEY=gsk_...
 services:
-  voicenote:
-    build: .
+  asr-system:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: asr-transliteration-system
     ports:
-      - "8501:8501"
-    env_file:
-      - .env
+      - "7860:7860"
     volumes:
       - ./outputs:/app/outputs
+      - ./sample_inputs:/app/sample_inputs
+    environment:
+      - PYTHONUNBUFFERED=1
+      - GRADIO_SERVER_NAME=0.0.0.0
+      - GRADIO_SERVER_PORT=7860
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:7860"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
