@@ -77,9 +77,57 @@ Stop with `Ctrl+C` or `docker compose down`.
 
 ---
 
+## Deployment
+
+The app reads host/port from environment variables (see **Configuration**), so the
+same code runs locally, in Docker, and on hosted platforms.
+
+### Hugging Face Spaces (easiest public demo)
+
+1. Create a Space → **SDK: Gradio**, then push this repo (or link it from GitHub).
+2. Tell the Space to use this entry point by adding a YAML header at the top of the
+   Space's own README (or in the Space settings):
+
+   ```yaml
+   ---
+   title: VoiceNote AI Transliteration
+   sdk: gradio
+   app_file: app/main.py
+   ---
+   ```
+
+3. `packages.txt` (contains `ffmpeg`) installs the system dependency automatically.
+4. The free CPU tier is slow with `whisper-medium`; set `WHISPER_MODEL_ID=openai/whisper-small`
+   in the Space's variables, or use a paid GPU Space.
+
+### Render / Railway (Docker, always-on)
+
+- Point the service at this repo; both detect the `Dockerfile`.
+- They inject `$PORT`, which `model_config.py` already honors — no code change needed.
+- Choose an instance with enough RAM (the `medium` model needs ~2–4 GB).
+
+### VPS / cloud VM (most control)
+
+```bash
+git clone https://github.com/samadarsh/VoiceNote-AI.git
+cd VoiceNote-AI
+docker compose up --build -d
+```
+
+Put Nginx/Caddy in front for HTTPS + a domain. Use a GPU instance and set
+`ASR_DEVICE=cuda` for fast transcription.
+
+### Quick temporary link
+
+Run with `GRADIO_SHARE=true python app/main.py` for a public URL that lasts ~72h
+(good for a quick demo, not production).
+
+---
+
 ## Configuration
 
-All runtime settings for the Gradio app live in **`models/model_config.py`** (not environment variables).
+Defaults live in **`models/model_config.py`** and can be overridden with environment
+variables (see `.env.example`).
 
 | Section | Key settings | Purpose |
 |---------|----------------|---------|
@@ -101,7 +149,17 @@ ASR_CONFIG["model_id"] = "openai/whisper-small"
 APP_CONFIG["share"] = True
 ```
 
-Docker Compose sets `GRADIO_SERVER_NAME` and `GRADIO_SERVER_PORT`; the app still reads host/port from `APP_CONFIG` in code.
+Equivalent environment variables (no code edit needed):
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `WHISPER_MODEL_ID` | `openai/whisper-medium` | ASR model |
+| `ASR_LANGUAGE` | `ta` | Transcription language |
+| `ASR_DEVICE` | `cpu` | `cuda` for GPU |
+| `GRADIO_SERVER_NAME` / `GRADIO_SERVER_PORT` | `0.0.0.0` / `7860` | Bind address |
+| `PORT` | — | Honored when `GRADIO_SERVER_PORT` is unset (Render/Railway) |
+| `GRADIO_SHARE` | `false` | Temporary public URL |
+| `CHUNK_DURATION_SEC` / `BUFFER_MAX_QUEUE` | `30` / `10` | Long-audio chunking |
 
 ---
 
@@ -127,10 +185,9 @@ VoiceNote-AI/
 │   └── test_pipeline.py
 ├── Dockerfile
 ├── docker-compose.yml
+├── packages.txt            # apt deps for Hugging Face Spaces (ffmpeg)
 └── requirements.txt
 ```
-
-Legacy folders (`core/`, `config.py`, etc.) may remain from an earlier Streamlit + Groq version; the **active** path is `python app/main.py` only.
 
 ---
 
