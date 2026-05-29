@@ -1,3 +1,14 @@
+---
+title: VoiceNote AI Transliteration
+emoji: 🎙️
+colorFrom: purple
+colorTo: indigo
+sdk: gradio
+sdk_version: 4.44.1
+app_file: app/main.py
+pinned: false
+---
+
 # VoiceNote AI — Transliteration
 
 Tamil voice-note pipeline: **Whisper ASR** (Tamil transcript) plus **custom Tamil-to-ASCII romanization**, served through a **Gradio** web UI. This is **script transliteration**, not translation into another language.
