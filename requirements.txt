@@ -15,6 +15,8 @@ huggingface-hub>=0.19.3,<1.0
 # Audio processing
 ffmpeg-python==0.2.0
 pydub>=0.25.1
+# `audioop` was removed from the stdlib in Python 3.13; pydub needs this backport there
+audioop-lts>=0.2.1; python_version >= "3.13"
 
 # ML / Torch
 torch>=2.1.0
